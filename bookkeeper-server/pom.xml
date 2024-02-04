@@ -379,7 +379,7 @@
     <profile>
       <id>badua-coverage</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
+        <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
         <!-- Use a stable version instead of SNAPSHOT one -->

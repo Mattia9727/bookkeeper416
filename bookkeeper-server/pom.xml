@@ -230,6 +230,13 @@
       <artifactId>awaitility</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- pit -->
+    <dependency>
+      <groupId>org.pitest</groupId>
+      <artifactId>pitest-maven</artifactId>
+      <version>${pitest-maven-plugin.version}</version>
+      <type>maven-plugin</type>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -330,31 +337,31 @@
         </dependency>
       </dependencies>
     </profile>
-<!--    <profile>-->
-<!--      <id>tls-certs</id>-->
-<!--      <build>-->
-<!--        <plugins>-->
-<!--          <plugin>-->
-<!--            <groupId>org.codehaus.mojo</groupId>-->
-<!--            <artifactId>exec-maven-plugin</artifactId>-->
-<!--            <executions>-->
-<!--              <execution>-->
-<!--                <id>Generate Self-Signed Certificates</id>-->
-<!--                <phase>generate-test-resources</phase>-->
-<!--                <goals>-->
-<!--                  <goal>exec</goal>-->
-<!--                </goals>-->
-<!--                <configuration>-->
-<!--                  <workingDirectory>${basedir}/src/test/resources</workingDirectory>-->
-<!--                  <executable>${basedir}/src/test/resources/generateKeysAndCerts.sh</executable>-->
-<!--                </configuration>-->
-<!--              </execution>-->
-<!--            </executions>-->
-<!--          </plugin>-->
-<!--        </plugins>-->
-<!--      </build>-->
-<!--    </profile>-->
-<!--    &lt;!&ndash; test profiles &ndash;&gt;-->
+    <profile>
+      <id>tls-certs</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>Generate Self-Signed Certificates</id>
+                <phase>generate-test-resources</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <workingDirectory>${basedir}/src/test/resources</workingDirectory>
+                  <executable>${basedir}/src/test/resources/generateKeysAndCerts.sh</executable>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!-- test profiles -->
 <!--    <profile>-->
 <!--      <id>skipBookKeeperServerTests</id>-->
 <!--      <activation>-->
@@ -375,7 +382,7 @@
 <!--      </build>-->
 <!--    </profile>-->
 
-    <!-- Ba-Dua Profile -->
+    <!-- ISW2: Ba-Dua Profile -->
     <profile>
       <id>badua-coverage</id>
       <activation>
@@ -424,6 +431,44 @@
         </plugins>
       </build>
     </profile>
+
+    <!-- PIT Profile-->
+    <profile>
+      <id>pit</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-maven</artifactId>
+            <version>${pitest-maven-plugin.version}</version>
+            <configuration>
+              <maxMutationsPerClass>5</maxMutationsPerClass>
+              <verbose>true</verbose>
+              <targetClasses>
+                <!--param>org.apache.bookkeeper.client.BookKeeper</param-->
+                <param>org.apache.bookkeeper.bookie.storage.ldb.ReadCache</param>
+              </targetClasses>
+              <targetTests>
+                <param>org.apache.bookkeeper.bookie.storage.ldb.ReadCacheTest</param>
+              </targetTests>
+            </configuration>
+            <executions>
+              <execution>
+                <id>Mutation Report</id>
+                <phase>test-compile</phase>
+                <goals>
+                  <goal>mutationCoverage</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
 
   </profiles>
 </project>

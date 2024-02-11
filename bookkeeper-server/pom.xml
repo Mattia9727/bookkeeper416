@@ -446,13 +446,15 @@
             <version>${pitest-maven-plugin.version}</version>
             <configuration>
               <maxMutationsPerClass>5</maxMutationsPerClass>
+              <threads>4</threads>
               <verbose>true</verbose>
+              <timeoutConstant>45000</timeoutConstant>
               <targetClasses>
                 <!--param>org.apache.bookkeeper.client.BookKeeper</param-->
-                <param>org.apache.bookkeeper.bookie.storage.ldb.ReadCache</param>
+                <param>org.apache.bookkeeper.client.LedgerHandle</param>
               </targetClasses>
               <targetTests>
-                <param>org.apache.bookkeeper.bookie.storage.ldb.ReadCacheTest</param>
+                <param>org.apache.bookkeeper.client.TestWaitForWritable</param>
               </targetTests>
             </configuration>
             <executions>

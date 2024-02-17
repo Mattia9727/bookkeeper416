@@ -390,8 +390,8 @@
       </activation>
       <properties>
         <!-- Use a stable version instead of SNAPSHOT one -->
-        <ba-dua.version>0.6.0</ba-dua.version>
-        <argLine>-javaagent:../dependencies/ba-dua-agent-rt-0.6.0-all.jar -Doutput.file=target/badua.ser
+        <ba-dua.version>0.4.0</ba-dua.version>
+        <argLine>-javaagent:../dependencies/ba-dua-agent-rt-0.4.0-all.jar -Doutput.file=target/badua.ser
         </argLine>
       </properties>
       <build>
@@ -412,7 +412,7 @@
                   <arguments>
                     <argument>-jar</argument>
                     <argument>
-                      ${project.basedir}/../dependencies/ba-dua-cli-0.6.0-all.jar
+                      ${project.basedir}/../dependencies/ba-dua-cli-0.4.0-all.jar
                     </argument>
                     <argument>report</argument>
                     <argument>-input</argument>
@@ -445,16 +445,16 @@
             <artifactId>pitest-maven</artifactId>
             <version>${pitest-maven-plugin.version}</version>
             <configuration>
-              <maxMutationsPerClass>5</maxMutationsPerClass>
               <threads>4</threads>
               <verbose>true</verbose>
               <timeoutConstant>45000</timeoutConstant>
               <targetClasses>
-                <!--param>org.apache.bookkeeper.client.BookKeeper</param-->
-                <param>org.apache.bookkeeper.client.LedgerHandle</param>
+<!--                <param>org.apache.bookkeeper.client.LedgerHandle</param>-->
+                <param>org.apache.bookkeeper.proto.PerChannelBookieClient</param>
               </targetClasses>
               <targetTests>
-                <param>org.apache.bookkeeper.client.TestWaitForWritable</param>
+<!--                <param>org.apache.bookkeeper.client.TestWaitForWritable</param>-->
+                <param>org.apache.bookkeeper.proto.TestReadEntry</param>
               </targetTests>
             </configuration>
             <executions>

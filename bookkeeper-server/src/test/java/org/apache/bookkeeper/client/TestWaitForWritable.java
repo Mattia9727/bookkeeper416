@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.lang.Thread.sleep;
 import static org.apache.bookkeeper.client.DistributionSchedule.NULL_WRITE_SET;
-import static org.apache.bookkeeper.client.TestWaitForWritable.ParamType.*;
 import static org.junit.Assert.*;
 
 
@@ -66,36 +65,36 @@ public class TestWaitForWritable{
         return Arrays.asList(new Object[][] {
                 //writeSet, allowedNonWritableCount, durationMs, disableWrite, exception
                 // Primi casi di test: category partition
-                {NULL,-1,-1,false,false},
-                {NULL,-1,0,false,false},
-                {NULL,-1,1,false,false},
-                {NULL,0,0,false,false},
-                {NULL,0,1,false,false},
-                {NULL,1,0,false,false},
-                {NULL,1,1,false,false},
-                {INVALID,-1,0,false,true},
-                {INVALID,-1,1,false,true},
-                {INVALID,0,0,false,true},
-                {INVALID,0,1,false,true},
-                {INVALID,1,0,false,true},
-                {INVALID,1,1,false,true},
-                {VALID,-1,0,false,false},
-                {VALID,-1,1,false,false},
-                {VALID,0,0,false,false},
-                {VALID,0,1,false,false},
-                {VALID,1,0,false,false},
-                {VALID,1,1,false,false},
+                {ParamType.NULL,-1,-1,false,false},
+                {ParamType.NULL,-1,0,false,false},
+                {ParamType.NULL,-1,1,false,false},
+                {ParamType.NULL,0,0,false,false},
+                {ParamType.NULL,0,1,false,false},
+                {ParamType.NULL,1,0,false,false},
+                {ParamType.NULL,1,1,false,false},
+                {ParamType.INVALID,-1,0,false,true},
+                {ParamType.INVALID,-1,1,false,true},
+                {ParamType.INVALID,0,0,false,true},
+                {ParamType.INVALID,0,1,false,true},
+                {ParamType.INVALID,1,0,false,true},
+                {ParamType.INVALID,1,1,false,true},
+                {ParamType.VALID,-1,0,false,false},
+                {ParamType.VALID,-1,1,false,false},
+                {ParamType.VALID,0,0,false,false},
+                {ParamType.VALID,0,1,false,false},
+                {ParamType.VALID,1,0,false,false},
+                {ParamType.VALID,1,1,false,false},
                 //Seconda iterazione: aggiunti test con scrittura disabilitata
-                {VALID,-1,0,true,false},//
-                {VALID,-1,1,true,false},//
-                {VALID,0,0,true,false},
-                {VALID,0,1,true,false},
-                {VALID,1,0,true,false},//
-                {VALID,1,1,true,false},
-//                //Terza iterazione: PIT e kill di mutazioni
-//                {VALID,-1,3000,true,false},
-//                {VALID,0,3000,true,false},
-//                {VALID,1,3000,true,false},
+                {ParamType.VALID,-1,0,true,false},//
+                {ParamType.VALID,-1,1,true,false},//
+                {ParamType.VALID,0,0,true,false},
+                {ParamType.VALID,0,1,true,false},
+                {ParamType.VALID,1,0,true,false},//
+                {ParamType.VALID,1,1,true,false},
+                //Tempi di attesa più lunghi per trigger InterruptException
+                {ParamType.VALID,-1,3000,true,false},
+                {ParamType.VALID,0,3000,true,false},
+                {ParamType.VALID,1,3000,true,false},
         });
     }
 
@@ -105,6 +104,8 @@ public class TestWaitForWritable{
     public static void startupLocalBookkeeper() throws Exception {
 
         boolean connected = false;
+
+
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -119,6 +120,9 @@ public class TestWaitForWritable{
                 }
             }
         });
+
+        // In locale, per velocizzare il setup dei test (soprattutto per PITest), il thread non viene lanciato.
+        // Al suo posto, viene lanciata un'istanza di LocalBookkeeper (codice in LocalBookkeeperLauncher.java)
         thread.start();
 
         while (!connected) {
@@ -188,7 +192,7 @@ public class TestWaitForWritable{
             else
                 assertTrue(testResult);
 
-            // waitForWritable async per trigger InterruptExceptions
+            //Seconda iterazione: coverage JaCoCo
             if (disableWrite){
                 AtomicBoolean isWriteable = new AtomicBoolean(false);
                 Thread wfwThread = new Thread(() -> isWriteable.set(ledgerHandle.waitForWritable(writeSet, allowedNonWritableCount, durationMs)));

@@ -455,6 +455,7 @@
               <targetTests>
 <!--                <param>org.apache.bookkeeper.client.TestWaitForWritable</param>-->
                 <param>org.apache.bookkeeper.proto.TestReadEntry</param>
+                <param>org.apache.bookkeeper.proto.TestReadEntryWaitForLACUpdate</param>
               </targetTests>
             </configuration>
             <executions>

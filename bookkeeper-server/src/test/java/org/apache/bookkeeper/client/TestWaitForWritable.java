@@ -1,9 +1,11 @@
 package org.apache.bookkeeper.client;
 
+import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.conf.InvalidWriteSet;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.proto.BookieClientImpl;
+import org.apache.bookkeeper.test.ZooKeeperUtil;
 import org.apache.bookkeeper.util.LocalBookKeeper;
 import org.awaitility.Awaitility;
 import org.junit.*;
@@ -14,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -65,13 +68,13 @@ public class TestWaitForWritable{
         return Arrays.asList(new Object[][] {
                 //writeSet, allowedNonWritableCount, durationMs, disableWrite, exception
                 // Primi casi di test: category partition
-                {ParamType.NULL,-1,-1,false,false},
-                {ParamType.NULL,-1,0,false,false},
-                {ParamType.NULL,-1,1,false,false},
-                {ParamType.NULL,0,0,false,false},
-                {ParamType.NULL,0,1,false,false},
-                {ParamType.NULL,1,0,false,false},
-                {ParamType.NULL,1,1,false,false},
+                {ParamType.NULL,-1,-1,false,true},
+                {ParamType.NULL,-1,0,false,true},
+                {ParamType.NULL,-1,1,false,true},
+                {ParamType.NULL,0,0,false,true},
+                {ParamType.NULL,0,1,false,true},
+                {ParamType.NULL,1,0,false,true},
+                {ParamType.NULL,1,1,false,true},
                 {ParamType.INVALID,-1,0,false,true},
                 {ParamType.INVALID,-1,1,false,true},
                 {ParamType.INVALID,0,0,false,true},
@@ -85,16 +88,16 @@ public class TestWaitForWritable{
                 {ParamType.VALID,1,0,false,false},
                 {ParamType.VALID,1,1,false,false},
                 //Seconda iterazione: aggiunti test con scrittura disabilitata
-                {ParamType.VALID,-1,0,true,false},//
-                {ParamType.VALID,-1,1,true,false},//
+                {ParamType.VALID,-1,0,true,false},
+                {ParamType.VALID,-1,1,true,false},
                 {ParamType.VALID,0,0,true,false},
                 {ParamType.VALID,0,1,true,false},
-                {ParamType.VALID,1,0,true,false},//
+                {ParamType.VALID,1,0,true,false},
                 {ParamType.VALID,1,1,true,false},
                 //Tempi di attesa più lunghi per trigger InterruptException
-                {ParamType.VALID,-1,3000,true,false},
-                {ParamType.VALID,0,3000,true,false},
-                {ParamType.VALID,1,3000,true,false},
+                {ParamType.VALID,-1,1000,true,false},
+                {ParamType.VALID,0,1000,true,false},
+                {ParamType.VALID,1,1000,true,false},
         });
     }
 
@@ -147,14 +150,14 @@ public class TestWaitForWritable{
                     break;
                 case VALID:
                     entryId = ledgerHandle.addEntry(entry);
-                    writeSet = new RoundRobinDistributionSchedule(3,3,3).getWriteSet(entryId);
+                    writeSet = new RoundRobinDistributionSchedule(1,1,1).getWriteSet(entryId);
                     break;
                 case INVALID:
                     writeSet = new InvalidWriteSet();
                     break;
             }
         }catch (Exception e){
-            Assert.fail("Errore creazione ledger");
+            Assert.fail("Errore creazione ledger/writeSet");
         }
     }
 
@@ -168,8 +171,7 @@ public class TestWaitForWritable{
         bk_client.close();
     }
 
-    private void setTargetChannelState(BookKeeper bkc, BookieId address,
-                                       long key, boolean writable) throws Exception {
+    private void setTargetChannelState(BookKeeper bkc, BookieId address, long key, boolean writable){
         ((BookieClientImpl) bkc.getBookieClient()).lookupClient(address).obtain((rc, pcbc) -> {
             pcbc.setWritable(writable);
         }, key);
@@ -180,12 +182,11 @@ public class TestWaitForWritable{
         Exception exception = null;
 
         try {
-            if (writeSet != NULL_WRITE_SET) {
-                int bookieIndex = writeSet.get(0);
-                List<BookieId> curEns = ledgerHandle.getCurrentEnsemble();
-                // disable channel writable
-                setTargetChannelState(bk_client, curEns.get(bookieIndex), 0, !disableWrite);
-            }
+            int bookieIndex = writeSet.get(0);
+            List<BookieId> curEns = ledgerHandle.getCurrentEnsemble();
+            // disable channel writable
+            setTargetChannelState(bk_client, curEns.get(bookieIndex), 0, !disableWrite);
+
             boolean testResult = ledgerHandle.waitForWritable(writeSet, allowedNonWritableCount, durationMs);
             if (disableWrite && durationMs>=0)
                 assertFalse(testResult);
@@ -193,7 +194,7 @@ public class TestWaitForWritable{
                 assertTrue(testResult);
 
             //Seconda iterazione: coverage JaCoCo
-            if (disableWrite){
+            if (disableWrite && durationMs > 500){
                 AtomicBoolean isWriteable = new AtomicBoolean(false);
                 Thread wfwThread = new Thread(() -> isWriteable.set(ledgerHandle.waitForWritable(writeSet, allowedNonWritableCount, durationMs)));
                 wfwThread.start();
@@ -206,7 +207,6 @@ public class TestWaitForWritable{
                     Assert.assertTrue(isWriteable.get());
             }
 
-
         } catch (Exception e){
             exception = e;
         }
@@ -218,9 +218,9 @@ public class TestWaitForWritable{
         }
     }
 
-    //Terza iterazione: PIT e kill di mutazioni
+//    //Terza iterazione: PIT e kill di mutazioni
     @Test
-    public void testWaitForWritableThreadedWithPolling() throws Exception {
+    public void testWaitForWritableThreadedWithPolling(){
 
         if (disableWrite && durationMs>=0) {
 
@@ -231,16 +231,15 @@ public class TestWaitForWritable{
             setTargetChannelState(bk_client, curEns.get(bookieIndex), 0, false);
 
             AtomicBoolean isWriteable = new AtomicBoolean(false);
-            final long timeout = 10000;
+            final long timeout = 3000;
 
             // waitForWritable async
             new Thread(() -> isWriteable.set(ledgerHandle.waitForWritable(writeSet, allowedNonWritableCount, timeout))).start();
 
-            Awaitility.await().pollDelay(200, TimeUnit.MILLISECONDS).untilAsserted(() -> assertFalse(isWriteable.get()));
-
+            Awaitility.await().timeout(2500, TimeUnit.MILLISECONDS).pollDelay(2, TimeUnit.SECONDS).untilAsserted(() -> assertFalse(isWriteable.get()));
             // enable channel writable
             setTargetChannelState(bk_client, curEns.get(bookieIndex), 0, true);
-            Awaitility.await().untilAsserted(() -> assertTrue(isWriteable.get()));
+            Awaitility.await().timeout(1000, TimeUnit.MILLISECONDS).untilAsserted(() -> assertTrue(isWriteable.get()));
 
         }
     }

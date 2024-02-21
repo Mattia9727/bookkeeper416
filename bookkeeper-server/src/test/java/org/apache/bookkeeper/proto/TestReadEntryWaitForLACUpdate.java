@@ -3,7 +3,6 @@ package org.apache.bookkeeper.proto;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
-import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.client.api.WriteFlag;
 import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.conf.*;
@@ -15,7 +14,6 @@ import org.junit.*;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
@@ -75,18 +73,7 @@ public class TestReadEntryWaitForLACUpdate {
                 this.callback = null;
                 break;
             case VALID:
-//                this.callback = getMockedReadCb(false);
-                this.callback = new BookkeeperInternalCallbacks.ReadEntryCallback() {
-                    @Override
-                    public void readEntryComplete(int rc, long ledgerId, long entryId,
-                                                  ByteBuf buffer, Object ctx) {
-                        if (buffer != null) {
-                            while (buffer.isReadable()) {
-                                System.out.print((char) buffer.readByte());
-                            }
-                        }
-                    }
-                };
+                this.callback = getReadCb(false);
                 break;
             case INVALID:
                 this.callback = getReadCb(true);
@@ -112,25 +99,23 @@ public class TestReadEntryWaitForLACUpdate {
         return Arrays.asList(new Object[][]{
                 //ledgerID,entryID,callback,context,previousLAC,timeOutInMillis,piggyBackEntry,v2wireprotocol
                 {0, 0, ParamType.NULL, ParamType.VALID, -1, -1, true, false},
-                {0, 0, ParamType.NULL, ParamType.VALID, -1, 0, true, true},
-                {0, 0, ParamType.INVALID, ParamType.VALID, -1, 1, true, false},
-                {0, 0, ParamType.INVALID, ParamType.VALID, 0, -1, true, true},
+                {0, 1, ParamType.NULL, ParamType.VALID, -1, 0, true, true},
+                {1, 0, ParamType.INVALID, ParamType.NULL, -1, 1, true, false},
+                {1, 1, ParamType.INVALID, ParamType.INVALID, 0, -1, true, true},
                 {0, 0, ParamType.VALID, ParamType.VALID, 0, 0, true, false},
-                {0, 0, ParamType.VALID, ParamType.VALID, 0, 1, true, true},
-                {0, 0, ParamType.NULL, ParamType.VALID, 1, -1, true, false},
-                {0, 0, ParamType.NULL, ParamType.VALID, 1, 0, true, true},
+                {0, 1, ParamType.VALID, ParamType.VALID, 0, 1, true, true},
+                {1, 0, ParamType.NULL, ParamType.NULL, 1, -1, true, false},
+                {1, 1, ParamType.NULL, ParamType.INVALID, 1, 0, true, true},
                 {0, 0, ParamType.INVALID, ParamType.VALID, 1, 1, true, false},
-                {0, 0, ParamType.INVALID, ParamType.VALID, -1, -1, false, true},
-                {0, 0, ParamType.VALID, ParamType.VALID, -1, 0, false, false},
-                {0, 0, ParamType.VALID, ParamType.VALID, -1, 1, false, true},
+                {0, 1, ParamType.INVALID, ParamType.VALID, -1, -1, false, true},
+                {1, 0, ParamType.VALID, ParamType.VALID, -1, 0, false, false},
+                {1, 1, ParamType.VALID, ParamType.NULL, -1, 1, false, true},
                 {0, 0, ParamType.NULL, ParamType.VALID, 0, -1, false, false},
-                {0, 0, ParamType.NULL, ParamType.VALID, 0, 0, false, true},
-                {0, 0, ParamType.INVALID, ParamType.VALID, 0, 1, false, false},
-                {0, 0, ParamType.INVALID, ParamType.VALID, 1, -1, false, true},
+                {0, 1, ParamType.NULL, ParamType.INVALID, 0, 0, false, true},
+                {1, 0, ParamType.INVALID, ParamType.VALID, 0, 1, false, false},
+                {1, 1, ParamType.INVALID, ParamType.NULL, 1, -1, false, true},
                 {0, 0, ParamType.VALID, ParamType.VALID, 1, 0, false, false},
-                {0, 0, ParamType.VALID, ParamType.VALID, 1, 1, false, true},
-                //nuova iterazione Ba-Dua
-                {0, 0, ParamType.VALID, ParamType.VALID, 1, 0, true, false},
+                {0, 1, ParamType.VALID, ParamType.INVALID, 1, 1, false, true},
         });
     }
 
@@ -182,13 +167,18 @@ public class TestReadEntryWaitForLACUpdate {
         server.getServer().getBookie().getLedgerStorage().setMasterKey(ledgerId,
                 "someMasterKey".getBytes(StandardCharsets.UTF_8));
         server.getServer().start();
-        return new PerChannelBookieClient(OrderedExecutor.newBuilder().build(), new NioEventLoopGroup(),
-                server.getServer().getBookieId(), BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
+
+        ClientConfiguration newConf = new ClientConfiguration();
+        if (v2wireprotocol) newConf.setUseV2WireProtocol(true);
+
+        return new PerChannelBookieClient(newConf, OrderedExecutor.newBuilder().build(), new NioEventLoopGroup(),
+                server.getServer().getBookieId(), NullStatsLogger.INSTANCE, null, null,
+                null, BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
 
     }
 
-    @BeforeClass
-    public static void setup(){
+    @Before
+    public void setup(){
         try {
             bookieClient = getPerChannelBookieClient(TestBKConfiguration.newServerConfiguration());
         } catch (Exception e) {
@@ -231,7 +221,7 @@ public class TestReadEntryWaitForLACUpdate {
 
     @After
     public void tearDown() {
-        this.server.getServer().getBookie().shutdown();
+        server.getServer().getBookie().shutdown();
     }
 
 

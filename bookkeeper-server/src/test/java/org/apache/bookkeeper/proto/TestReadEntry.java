@@ -4,7 +4,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import org.apache.bookkeeper.bookie.BookieException;
-import org.apache.bookkeeper.bookie.LedgerStorage;
 import org.apache.bookkeeper.client.api.WriteFlag;
 import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -121,30 +120,32 @@ public class TestReadEntry {
             {0, 0, ParamType.NULL, ParamType.NULL, 0, ParamType.NULL, false},
             {0, 1, ParamType.NULL, ParamType.NULL, 1, ParamType.NULL, false},
             {1, 0, ParamType.NULL, ParamType.NULL, 2, ParamType.EMPTY, false},
-            {1, 1, ParamType.INVALID, ParamType.NULL, 3, ParamType.INVALID, false},
+            {1, 1, ParamType.INVALID, ParamType.NULL, 4, ParamType.INVALID, false},
             {0, 0, ParamType.INVALID, ParamType.NULL, 4, ParamType.INVALID, false},
-            {0, 1, ParamType.INVALID, ParamType.NULL, 5, ParamType.VALID, true},
-            {1, 0, ParamType.VALID, ParamType.NULL, 6, ParamType.NULL, true},
-            {1, 1, ParamType.VALID, ParamType.NULL, 7, ParamType.EMPTY, true},
-            {0, 0, ParamType.VALID, ParamType.NULL, 7, ParamType.EMPTY, true},
-            {0, 1, ParamType.NULL, ParamType.INVALID, 6, ParamType.INVALID, true},
-            {1, 0, ParamType.NULL, ParamType.INVALID, 5, ParamType.VALID, false},
+            {0, 1, ParamType.INVALID, ParamType.NULL, 2, ParamType.VALID, true},
+            {1, 0, ParamType.VALID, ParamType.NULL, 1, ParamType.NULL, true},
+            {1, 1, ParamType.VALID, ParamType.NULL, 0, ParamType.EMPTY, true},
+            {0, 0, ParamType.VALID, ParamType.NULL, 0, ParamType.EMPTY, true},
+            {0, 1, ParamType.NULL, ParamType.INVALID, 2, ParamType.INVALID, true},
+            {1, 0, ParamType.NULL, ParamType.INVALID, 1, ParamType.VALID, false},
             {1, 1, ParamType.NULL, ParamType.INVALID, 4, ParamType.VALID, false},
-            {0, 0, ParamType.INVALID, ParamType.INVALID, 3, ParamType.NULL, false},
-            {0, 1, ParamType.INVALID, ParamType.INVALID, 2, ParamType.NULL, false},
+            {0, 0, ParamType.INVALID, ParamType.INVALID, 2, ParamType.NULL, false},
+            {0, 1, ParamType.INVALID, ParamType.INVALID, 4, ParamType.NULL, false},
             {1, 0, ParamType.INVALID, ParamType.INVALID, 1, ParamType.EMPTY, false},
             {1, 1, ParamType.VALID, ParamType.INVALID, 0, ParamType.INVALID, true},
-            {0, 0, ParamType.VALID, ParamType.INVALID, 0, ParamType.INVALID, true},
+            {0, 0, ParamType.VALID, ParamType.INVALID, 2, ParamType.INVALID, true},
             {0, 1, ParamType.VALID, ParamType.INVALID, 1, ParamType.VALID, true},
-            {1, 0, ParamType.NULL, ParamType.VALID, 2, ParamType.NULL, true},
-            {1, 1, ParamType.NULL, ParamType.VALID, 3, ParamType.NULL, true},
-            {0, 0, ParamType.NULL, ParamType.VALID, 4, ParamType.EMPTY, false},
-            {0, 1, ParamType.INVALID, ParamType.VALID, 5, ParamType.INVALID, false},
-            {1, 0, ParamType.INVALID, ParamType.VALID, 6, ParamType.INVALID, false},
-            {1, 1, ParamType.INVALID, ParamType.VALID, 7, ParamType.VALID, false},
-            {0, 0, ParamType.VALID, ParamType.VALID, 7, ParamType.NULL, false},
-            {0, 1, ParamType.VALID, ParamType.VALID, 6, ParamType.EMPTY, true},
-            {1, 0, ParamType.VALID, ParamType.VALID, 5, ParamType.INVALID, true},
+            {1, 0, ParamType.NULL, ParamType.VALID, 4, ParamType.NULL, true},
+            {1, 1, ParamType.NULL, ParamType.VALID, 0, ParamType.NULL, true},
+            {0, 0, ParamType.NULL, ParamType.VALID, 0, ParamType.EMPTY, false},
+            {0, 1, ParamType.INVALID, ParamType.VALID, 4, ParamType.INVALID, false},
+            {1, 0, ParamType.INVALID, ParamType.VALID, 2, ParamType.INVALID, false},
+            {1, 1, ParamType.INVALID, ParamType.VALID, 1, ParamType.VALID, false},
+            {0, 0, ParamType.VALID, ParamType.VALID, 4, ParamType.NULL, false},
+            {0, 1, ParamType.VALID, ParamType.VALID, 1, ParamType.EMPTY, true},
+            {1, 0, ParamType.VALID, ParamType.VALID, 0, ParamType.INVALID, true},
+                //Iterazione PIT
+            {0, 0, ParamType.VALID, ParamType.VALID, 5, ParamType.NULL, true},
         });
     }
 
@@ -181,12 +182,8 @@ public class TestReadEntry {
 
             @Override
             public void writeComplete(int rc, long ledger, long entry, BookieId addr, Object ctx) {
-                System.out.println("In writecomplete");
-                if (rc != 0) { //rc=0 indica che non c'è stato alcun errore
-                    errorResultFromWriteCallback = true;
-                }
-                System.out.println(rc);
-                System.out.println(errorResultFromWriteCallback);
+                if (rc != 0) errorResultFromWriteCallback = true; //rc=0 indica che non c'è stato alcun errore
+                else errorResultFromWriteCallback = false;
             }
         };
         return cb;
@@ -219,6 +216,7 @@ public class TestReadEntry {
                 new Object(), 0, false, writeFlags);
 
         // Ho provato ad aggiungere la entry, ma qualsiasi configurazione usi ottengo dal callback rc=-8 (BKBookieHandleNotAvailableException)
+        // nonostante il bookie venga creato all'interno di ServerTester.
         // Per cui, i test effettuati riguardano unicamente il comportamento del metodo readEntry
     }
 
@@ -237,6 +235,8 @@ public class TestReadEntry {
                     this.flags, this.masterKey, this.allowFastFail);
 
             Assert.assertFalse("An exception was expected.", isExceptionExpected);
+//            sleep(1000);
+//            if (!resultFromReadCallback.equals("")) Assert.assertEquals("someEntry",resultFromReadCallback);
 
         } catch (Exception e) {
             System.out.println("Exception catched.");
@@ -247,11 +247,10 @@ public class TestReadEntry {
     }
 
 
-//    @AfterClass
-//    public static void tearDown() {
-//        server.getServer().getBookie().shutdown();
-//
-//    }
+    @AfterClass
+    public static void tearDown() {
+        server.getServer().getBookie().shutdown();
+    }
 
 
 }
